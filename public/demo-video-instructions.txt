@@ -1,0 +1,44 @@
+DEMO VIDEO SETUP INSTRUCTIONS
+===============================
+
+To add your hand gesture demo video:
+
+1. Place your demo video file in this folder (public/) with one of these names:
+   - demo-video.mp4 (preferred)
+   - demo-video.webm (alternative)
+
+2. The video should demonstrate:
+   - Proper hand positioning in front of camera
+   - Clear execution of supported gestures:
+     * Open Palm (Stop/Wait)
+     * Thumbs Up (Good/Yes/Approve)
+     * Peace Sign (Victory/Two)
+     * Pointing (Attention/Direction)
+     * Fist (Power/Strength)
+     * OK Sign (Okay/Perfect)
+     * Rock On (Cool/Awesome)
+     * Number 1, 2, 3
+
+3. Recommended video specifications:
+   - Duration: 30-60 seconds
+   - Resolution: 720p or 1080p
+   - Format: MP4 (H.264 encoding)
+   - Size: Under 10MB for web optimization
+
+4. The video will:
+   - Open in a professional modal overlay
+   - Include playback controls
+   - Show instructions below the video
+   - Have a close button for easy dismissal
+
+Current file structure should be:
+public/
+├── demo-video.mp4 (your video file)
+├── favicon.ico
+├── index.html
+├── logo192.png
+├── logo512.png
+├── manifest.json
+└── robots.txt
+
+Once you add the video file, the demo button will show your actual demo video instead of the placeholder message.
