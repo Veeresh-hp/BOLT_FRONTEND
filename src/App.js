@@ -44,6 +44,7 @@ const LipReadingApp = () => {
   const [currentInterface, setCurrentInterface] = useState('lip-reading'); // 'lip-reading' or 'hand-gesture'
   const [isHandGestureDemo, setIsHandGestureDemo] = useState(false);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isControlsVisible, setIsControlsVisible] = useState(false);
   const [videoPlaybackSpeed, setVideoPlaybackSpeed] = useState(1);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
@@ -60,6 +61,27 @@ const LipReadingApp = () => {
   const [isHandGestureProcessing, setIsHandGestureProcessing] = useState(false);
   const [gestureText, setGestureText] = useState('');
   const [savedGestures, setSavedGestures] = useState([]);
+  // Track all detected gesture texts
+  const [gestureHistory, setGestureHistory] = useState([]);
+  // Ensure gestureHistory always reflects the full gestureText as shown on the gesture page
+  useEffect(() => {
+    if (gestureText) {
+      setGestureHistory(prev => {
+        // Remove all previous entries for this gestureText
+        const filtered = prev.filter(item => item.text !== gestureText);
+        // Add the latest entry at the top
+        return [
+          {
+            id: Date.now() + Math.random(),
+            text: gestureText,
+            timestamp: new Date().toLocaleString(),
+            confidence: gestureConfidence.toFixed(1),
+          },
+          ...filtered
+        ];
+      });
+    }
+  }, [gestureText, gestureConfidence, gestureHistory]);
 
   // Audio/TTS state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -76,6 +98,8 @@ const LipReadingApp = () => {
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [confirmMessage, setConfirmMessage] = useState('');
   const [confirmAction, setConfirmAction] = useState(null);
+  const [historyFilter, setHistoryFilter] = useState('all'); // 'all', 'lip-reading', 'gesture'
+  const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   // UI state: expand/collapse long saved texts
   const [expandedSaved, setExpandedSaved] = useState({});
   // Toast notifications
@@ -177,6 +201,7 @@ const LipReadingApp = () => {
             timestamp: new Date().toLocaleString(),
             confidence: (90 + Math.random() * 8).toFixed(1),
             isSaved: false,
+            type: 'lip-reading', // Flag to identify lip reading history
           };
           return [historyItem, ...h];
         });
@@ -205,8 +230,36 @@ const LipReadingApp = () => {
       setTimeout(() => {
         const randomGesture = gestureTypes[Math.floor(Math.random() * gestureTypes.length)];
         const gestureAction = gestureActions[randomGesture];
-        setGestureText(prev => prev ? `${prev} ${gestureAction}` : gestureAction);
-        setGestureConfidence(88 + Math.random() * 10);
+        setGestureText(prev => {
+          const newText = prev ? `${prev} ${gestureAction}` : gestureAction;
+          const confidenceVal = (88 + Math.random() * 10);
+          setGestureConfidence(confidenceVal);
+          setGestureHistory(historyPrev => [
+            {
+              id: Date.now() + Math.random(),
+              text: newText,
+              timestamp: new Date().toLocaleString(),
+              confidence: confidenceVal.toFixed(1),
+            },
+            ...historyPrev
+          ]);
+          // Only push to allHistory if the latest entry is different
+          setAllHistory(h => {
+            if (h.length > 0 && h[0].text === newText) return h;
+            return [
+              {
+                id: Date.now() + Math.random(),
+                text: newText,
+                timestamp: new Date().toLocaleString(),
+                confidence: confidenceVal.toFixed(1),
+                isSaved: false,
+                type: 'gesture',
+              },
+              ...h
+            ];
+          });
+          return newText;
+        });
         setIsHandGestureProcessing(false);
       }, 1000 + Math.random() * 1500);
     }, 2500 + Math.random() * 2000);
@@ -594,7 +647,9 @@ const LipReadingApp = () => {
             className="h-8 sm:h-10 w-auto object-contain"
           />
         </div>
-        <div className="flex flex-wrap gap-3 sm:gap-6">
+        <div className={`flex flex-wrap gap-3 sm:gap-6 transition-all duration-300 ${
+          isScrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}>
           <button onClick={() => navigateToPage('home')} className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 transform hover:scale-105 ${
             isScrolled 
               ? 'text-orange-400 hover:bg-orange-500/20 border border-transparent' 
@@ -1227,20 +1282,12 @@ const LipReadingApp = () => {
                   <div className="bg-gray-900/50 rounded-xl p-6 sm:p-8 min-h-48 max-h-64 sm:min-h-64 sm:max-h-72 md:min-h-80 md:max-h-80 overflow-y-auto">
                     {gestureText ? (
                       <div className="space-y-6">
-                        <div className="text-center">
-                          <div className="text-8xl mb-4 animate-bounce">
-                            {gestureTypes.find(g => g.name === gestureText)?.emoji || '👋'}
+                        <div className="space-y-4">
+                          <p className="text-gray-300 leading-relaxed text-lg">{gestureText}</p>
+                          <div className="flex items-center justify-between pt-4 border-t border-gray-700">
+                            <span className="text-sm text-gray-500">Confidence: {gestureConfidence.toFixed(1)}%</span>
+                            <span className="text-sm text-gray-500">Total Detected: {savedGestures.length}</span>
                           </div>
-                          <h4 className="text-3xl font-bold text-white mb-2">{gestureText}</h4>
-                          <p className="text-xl text-purple-300 mb-4">
-                            {gestureTypes.find(g => g.name === gestureText)?.meaning || 'Gesture detected'}
-                          </p>
-                        </div>
-                        <div className="flex items-center justify-between pt-4 border-t border-purple-700/30">
-                          <span className="text-sm text-gray-400">Confidence: {gestureConfidence.toFixed(1)}%</span>
-                          <span className="text-sm text-gray-400">
-                            Total Detected: {savedGestures.length}
-                          </span>
                         </div>
                       </div>
                     ) : (
@@ -1453,7 +1500,9 @@ const LipReadingApp = () => {
           : 'bg-black/80 backdrop-blur-xl border-b border-orange-500/20 shadow-lg'
       }`}>
         <div className="flex items-center">
-          <button onClick={() => navigateToPage('home')} className="flex items-center space-x-2 px-2 py-2 rounded-lg text-gray-300 hover:text-orange-400 hover:bg-orange-500/10 border border-transparent hover:border-orange-500/30 transition-all duration-300">
+          <button onClick={() => navigateToPage('home')} className={`flex items-center space-x-2 px-2 py-2 rounded-lg text-gray-300 hover:text-orange-400 hover:bg-orange-500/10 border border-transparent hover:border-orange-500/30 transition-all duration-300 ${
+            isScrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          }`}>
             <ArrowLeft size={20} />
           </button>
           <img 
@@ -1462,7 +1511,9 @@ const LipReadingApp = () => {
             className="h-8 sm:h-10 w-auto object-contain ml-2"
           />
         </div>
-        <div className="flex flex-wrap gap-3 sm:gap-6">
+        <div className={`flex flex-wrap gap-3 sm:gap-6 transition-all duration-300 ${
+          isScrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}>
           <button onClick={() => navigateToPage('home')} className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all duration-300 ${
             isScrolled 
               ? 'text-gray-300 hover:text-orange-400 hover:bg-orange-500/20 border border-transparent' 
@@ -1565,7 +1616,9 @@ const LipReadingApp = () => {
           : 'bg-black/80 backdrop-blur-xl border-b border-orange-500/20 shadow-lg'
       }`}>
         <div className="flex items-center">
-          <button onClick={() => navigateToPage('home')} className="flex items-center space-x-2 px-2 py-2 rounded-lg text-gray-300 hover:text-orange-400 hover:bg-orange-500/10 border border-transparent hover:border-orange-500/30 transition-all duration-300">
+          <button onClick={() => navigateToPage('home')} className={`flex items-center space-x-2 px-2 py-2 rounded-lg text-gray-300 hover:text-orange-400 hover:bg-orange-500/10 border border-transparent hover:border-orange-500/30 transition-all duration-300 ${
+            isScrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          }`}>
             <ArrowLeft size={20} />
           </button>
           <img 
@@ -1574,7 +1627,9 @@ const LipReadingApp = () => {
             className="h-8 sm:h-10 w-auto object-contain ml-2"
           />
         </div>
-        <div className="flex flex-wrap gap-3 sm:gap-6">
+        <div className={`flex flex-wrap gap-3 sm:gap-6 transition-all duration-300 ${
+          isScrolled ? 'opacity-0 pointer-events-none' : 'opacity-100'
+        }`}>
           <button onClick={() => navigateToPage('home')} className="flex items-center space-x-2 px-4 py-2 rounded-lg text-gray-300 hover:text-orange-400 hover:bg-orange-500/10 border border-transparent hover:border-orange-500/30 transition-all duration-300">
             <Home size={20} />
             <span className="font-medium">Home</span>
@@ -1770,12 +1825,12 @@ const LipReadingApp = () => {
               }}></div>
             </div>
 
-            {/* Modal Header */}
+            {/* Modal Header with Tabs */}
             <div className="relative z-10 flex items-center justify-between p-6 border-b border-orange-500/20 bg-black/40 backdrop-blur-lg">
               <h2 className="text-2xl font-bold text-white flex items-center">
                 <History className="mr-3 text-orange-400" size={24} />
                 <span className="bg-gradient-to-r from-orange-400 via-amber-500 to-orange-600 bg-clip-text text-transparent">
-                  Complete History
+                  History
                 </span>
               </h2>
               <button onClick={() => setIsHistoryModalOpen(false)} className="text-gray-400 hover:text-orange-400 transition-all duration-300 p-2 hover:bg-orange-500/10 rounded-lg border border-transparent hover:border-orange-500/30">
@@ -1783,113 +1838,105 @@ const LipReadingApp = () => {
               </button>
             </div>
 
+
             {/* Modal Content */}
             <div className="relative z-10 p-6 overflow-y-auto flex-1 bg-black/20 backdrop-blur-sm">
-              {allHistory.length === 0 ? (
+              {allHistory.length === 0 && savedGestures.length === 0 ? (
                 <div className="text-center py-12">
                   <div className="bg-gradient-to-br from-orange-500/20 to-amber-500/20 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6 border border-orange-500/30">
                     <History size={48} className="text-orange-400" />
                   </div>
                   <p className="text-gray-300 text-lg mb-2">No history available yet</p>
-                  <p className="text-gray-400 text-sm">Start using live mode to see your transcription history</p>
+                  <p className="text-gray-400 text-sm">Start using live mode or gesture detection to see your history</p>
                 </div>
               ) : (
                 <div className="space-y-6">
-                  {/* Saved Texts Section */}
-                  {savedTexts.length > 0 && (
-                    <div>
-                      <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                        <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 rounded-lg p-2 mr-3 border border-green-500/30">
-                          <Save className="text-green-400" size={20} />
+                  {/* Transactions Section with Sort Options */}
+                  <div>
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-xl font-semibold text-white flex items-center">
+                        <div className="bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-lg p-2 mr-3 border border-blue-500/30">
+                          <History className="text-blue-400" size={20} />
                         </div>
-                        <span className="bg-gradient-to-r from-green-400 to-emerald-500 bg-clip-text text-transparent">
-                          Saved Texts ({savedTexts.length})
+                        <span className="bg-gradient-to-r from-blue-400 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                          All Transactions ({historyFilter === 'all' ? allHistory.length : allHistory.filter(item => item.type === historyFilter).length})
                         </span>
                       </h3>
-                      <div className="grid gap-4">
-                        {savedTexts.map((item) => (
-                          <div key={item.id} className="bg-gradient-to-br from-green-900/30 via-green-800/20 to-emerald-900/30 border border-green-500/30 rounded-xl p-6 backdrop-blur-lg relative overflow-hidden">
-                            {/* Card decoration */}
-                            <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-green-500/10 to-transparent rounded-bl-xl"></div>
-                            <div className="absolute bottom-0 left-0 w-16 h-16 bg-gradient-to-tr from-emerald-500/10 to-transparent rounded-tr-xl"></div>
-                            
-                            <div className="relative z-10 flex justify-between items-start mb-2">
-                              <div className="flex-1">
-                                <p className="text-gray-200 mb-3 leading-relaxed text-sm sm:text-base">{item.text}</p>
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-gray-400">{item.timestamp}</span>
-                                  <span className="text-green-400 font-medium">Confidence: {item.confidence}%</span>
-                                </div>
-                              </div>
-                            </div>
-                            <div className="relative z-10 flex items-center space-x-2 mt-4">
-                              <button onClick={() => downloadSingleText(item.text, item.timestamp)} className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white text-sm rounded-lg transition-all duration-300 border border-blue-500/30">
-                                <Download size={14} />
-                                <span>Download</span>
+                      {/* Sort/Filter Options */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-400 text-sm">Filter:</span>
+                        <div 
+                          className="relative"
+                          onMouseEnter={() => setIsFilterDropdownOpen(true)}
+                          onMouseLeave={() => setIsFilterDropdownOpen(false)}
+                        >
+                          <button className="bg-gradient-to-r from-orange-500/20 to-amber-500/20 border border-orange-500/30 rounded-lg px-4 py-2 text-orange-300 text-sm focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 hover:from-orange-500/30 hover:to-amber-500/30 transition-all duration-300 flex items-center gap-2 backdrop-blur-sm">
+                            {historyFilter === 'all' ? 'All Transactions' : 
+                             historyFilter === 'lip-reading' ? 'Lip Reading Only' : 
+                             'Gesture Text Only'}
+                            <ChevronDown size={16} className={`transition-transform duration-200 ${isFilterDropdownOpen ? 'rotate-180' : ''}`} />
+                          </button>
+                          
+                          {/* Dropdown Menu */}
+                          <div className={`absolute top-full left-0 mt-1 w-48 bg-gradient-to-br from-gray-900/95 via-black/90 to-gray-800/95 backdrop-blur-xl border border-orange-500/30 rounded-lg shadow-xl z-50 overflow-hidden transition-all duration-300 ${
+                            isFilterDropdownOpen ? 'opacity-100 translate-y-0 pointer-events-auto animate-dropdown-in' : 'opacity-0 -translate-y-2 pointer-events-none'
+                          }`}>
+                            <div className="py-1">
+                              <button
+                                onClick={() => setHistoryFilter('all')}
+                                className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 flex items-center gap-2 ${
+                                  historyFilter === 'all' 
+                                    ? 'bg-gradient-to-r from-orange-500/30 to-amber-500/30 text-orange-300 border-l-2 border-orange-500' 
+                                    : 'text-gray-300 hover:bg-gradient-to-r hover:from-orange-500/20 hover:to-amber-500/20 hover:text-orange-200'
+                                }`}
+                              >
+                                All Transactions
+                                {historyFilter === 'all' && <CheckCircle2 size={16} className="ml-auto text-orange-400" />}
                               </button>
-                              <button onClick={() => unsaveText(item.id)} className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white text-sm rounded-lg transition-all duration-300 border border-orange-500/30">
-                                <BookmarkMinus size={14} />
-                                <span>Unsave</span>
+                              <button
+                                onClick={() => setHistoryFilter('lip-reading')}
+                                className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 flex items-center gap-2 ${
+                                  historyFilter === 'lip-reading' 
+                                    ? 'bg-gradient-to-r from-orange-500/30 to-amber-500/30 text-orange-300 border-l-2 border-orange-500' 
+                                    : 'text-gray-300 hover:bg-gradient-to-r hover:from-orange-500/20 hover:to-amber-500/20 hover:text-orange-200'
+                                }`}
+                              >
+                                Lip Reading Only
+                                {historyFilter === 'lip-reading' && <CheckCircle2 size={16} className="ml-auto text-orange-400" />}
                               </button>
-                              <button onClick={() => deleteFromHistory(item.id)} className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm rounded-lg transition-all duration-300 border border-red-500/30">
-                                <Trash2 size={14} />
-                                <span>Delete</span>
+                              <button
+                                onClick={() => setHistoryFilter('gesture')}
+                                className={`w-full text-left px-4 py-3 text-sm transition-all duration-200 flex items-center gap-2 ${
+                                  historyFilter === 'gesture' 
+                                    ? 'bg-gradient-to-r from-orange-500/30 to-amber-500/30 text-orange-300 border-l-2 border-orange-500' 
+                                    : 'text-gray-300 hover:bg-gradient-to-r hover:from-orange-500/20 hover:to-amber-500/20 hover:text-orange-200'
+                                }`}
+                              >
+                                Gesture Text Only
+                                {historyFilter === 'gesture' && <CheckCircle2 size={16} className="ml-auto text-orange-400" />}
                               </button>
                             </div>
                           </div>
-                        ))}
+                        </div>
                       </div>
                     </div>
-                  )}
-
-                  {/* All History Section */}
-                  <div>
-                    <h3 className="text-xl font-semibold text-white mb-4 flex items-center">
-                      <div className="bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-lg p-2 mr-3 border border-orange-500/30">
-                        <History className="text-orange-400" size={20} />
-                      </div>
-                      <span className="bg-gradient-to-r from-orange-400 via-amber-500 to-orange-600 bg-clip-text text-transparent">
-                        All Transcriptions ({allHistory.length})
-                      </span>
-                    </h3>
                     <div className="grid gap-4">
-                      {allHistory.map((item) => (
-                        <div
-                          key={item.id}
-                          className={`rounded-xl p-6 border backdrop-blur-lg relative overflow-hidden transition-all duration-300 ${
-                            item.isSaved 
-                              ? 'bg-gradient-to-br from-green-900/30 via-green-800/20 to-emerald-900/30 border-green-500/30' 
-                              : 'bg-gradient-to-br from-gray-900/50 via-black/30 to-gray-800/50 border-orange-500/20 hover:border-orange-500/40'
-                          }`}
-                        >
+                      {(historyFilter === 'all' ? allHistory : allHistory.filter(item => item.type === historyFilter)).map((item) => (
+                        <div key={item.id} className="rounded-xl p-6 border backdrop-blur-lg relative overflow-hidden transition-all duration-300 bg-gradient-to-br from-gray-900/50 via-black/30 to-gray-800/50 border-blue-500/20 hover:border-blue-500/40">
                           {/* Card decoration */}
-                          <div className={`absolute top-0 right-0 w-20 h-20 rounded-bl-xl ${
-                            item.isSaved 
-                              ? 'bg-gradient-to-br from-green-500/10 to-transparent' 
-                              : 'bg-gradient-to-br from-orange-500/10 to-transparent'
-                          }`}></div>
-                          <div className={`absolute bottom-0 left-0 w-16 h-16 rounded-tr-xl ${
-                            item.isSaved 
-                              ? 'bg-gradient-to-tr from-emerald-500/10 to-transparent' 
-                              : 'bg-gradient-to-tr from-amber-500/10 to-transparent'
-                          }`}></div>
-                          
+                          <div className="absolute top-0 right-0 w-20 h-20 rounded-bl-xl bg-gradient-to-br from-blue-500/10 to-transparent"></div>
+                          <div className="absolute bottom-0 left-0 w-16 h-16 rounded-tr-xl bg-gradient-to-tr from-cyan-500/10 to-transparent"></div>
                           <div className="relative z-10 flex justify-between items-start mb-2">
                             <div className="flex-1">
                               <div className="flex items-center mb-3">
-                                {item.isSaved && (
-                                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs bg-gradient-to-r from-green-600 to-emerald-600 text-white mr-2 border border-green-500/30">
-                                    <Save size={12} className="mr-1" />
-                                    Saved
-                                  </span>
-                                )}
+                                <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold mr-2 border ${item.type === 'lip-reading' ? 'bg-orange-500/20 text-orange-300 border-orange-500/30' : 'bg-purple-500/20 text-purple-300 border-purple-500/30'}`}>
+                                  {item.type === 'lip-reading' ? 'Lip Reading' : 'Gesture Text'}
+                                </span>
                               </div>
                               <p className="text-gray-200 mb-3 leading-relaxed text-sm sm:text-base">{item.text}</p>
                               <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-400">{item.timestamp}</span>
-                                <span className={`font-medium ${item.isSaved ? 'text-green-400' : 'text-orange-400'}`}>
-                                  Confidence: {item.confidence}%
-                                </span>
+                                <span className={`font-medium ${item.type === 'lip-reading' ? 'text-orange-400' : 'text-purple-400'}`}>Confidence: {item.confidence}%</span>
                               </div>
                             </div>
                           </div>
@@ -1898,28 +1945,6 @@ const LipReadingApp = () => {
                               <Download size={14} />
                               <span>Download</span>
                             </button>
-                            {!item.isSaved ? (
-                              <button
-                                onClick={() => {
-                                  const savedItem = { ...item, isSaved: true };
-                                  setSavedTexts((prev) => {
-                                    if (prev.some((p) => p.id === savedItem.id || p.text === savedItem.text)) return prev;
-                                    return [savedItem, ...prev];
-                                  });
-                                  setAllHistory((prev) => prev.map((hist) => (hist.id === item.id ? { ...hist, isSaved: true } : hist)));
-                                  if (typeof showToast === 'function') showToast('Saved to Recent Saves', 'success');
-                                }}
-                                className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white text-sm rounded-lg transition-all duration-300 border border-green-500/30"
-                              >
-                                <Save size={14} />
-                                <span>Save</span>
-                              </button>
-                            ) : (
-                              <button onClick={() => unsaveText(item.id)} className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700 text-white text-sm rounded-lg transition-all duration-300 border border-orange-500/30">
-                                <BookmarkMinus size={14} />
-                                <span>Unsave</span>
-                              </button>
-                            )}
                             <button onClick={() => deleteFromHistory(item.id)} className="flex items-center space-x-1 px-3 py-2 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white text-sm rounded-lg transition-all duration-300 border border-red-500/30">
                               <Trash2 size={14} />
                               <span>Delete</span>
@@ -2007,7 +2032,11 @@ const LipReadingApp = () => {
       {/* Demo Video Modal */}
       {isVideoModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="relative w-full max-w-4xl max-h-[90vh] bg-gradient-to-br from-slate-900 via-black to-gray-900 backdrop-blur-lg rounded-2xl border border-orange-500/20 shadow-2xl overflow-hidden">
+          <div 
+            className="relative w-full max-w-3xl max-h-[80vh] bg-gradient-to-br from-slate-900 via-black to-gray-900 backdrop-blur-lg rounded-2xl border border-orange-500/20 shadow-2xl overflow-hidden flex flex-col"
+            onMouseEnter={() => setIsControlsVisible(true)}
+            onMouseLeave={() => setIsControlsVisible(false)}
+          >
             {/* Professional background graphics */}
             <div className="absolute inset-0">
               {/* Gradient orbs for demo video theme */}
@@ -2026,13 +2055,17 @@ const LipReadingApp = () => {
             </div>
 
             {/* Modal Header */}
-            <div className="relative z-10 flex items-center justify-between p-6 border-b border-orange-500/20 bg-gradient-to-r from-black/60 via-gray-900/80 to-black/60 backdrop-blur-lg">
+            <div className={`relative z-10 flex items-center justify-between p-4 border-b backdrop-blur-lg transition-all duration-500 ${
+              isControlsVisible 
+                ? 'border-orange-500/20 bg-gradient-to-r from-black/60 via-gray-900/80 to-black/60' 
+                : 'border-orange-500/10 bg-gradient-to-r from-black/40 via-gray-900/60 to-black/40'
+            }`}>
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-lg border border-orange-500/30">
-                  <Play className="text-orange-400" size={24} />
+                <div className="p-1.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-lg border border-orange-500/30">
+                  <Play className="text-orange-400" size={20} />
                 </div>
                 <div>
-                  <h2 className="text-2xl font-bold text-white">
+                  <h2 className="text-xl font-bold text-white">
                     <span className="bg-gradient-to-r from-orange-400 via-amber-500 to-orange-600 bg-clip-text text-transparent">
                       Hand Gesture Demo
                     </span>
@@ -2049,11 +2082,11 @@ const LipReadingApp = () => {
             </div>
 
             {/* Video Content */}
-            <div className="relative">
+            <div className="relative flex-1 flex flex-col">
               <video
                 ref={demoVideoRef}
-                className="w-full h-auto max-h-[70vh] object-contain bg-black"
-                controls
+                className="w-full flex-1 object-contain bg-black"
+                controls={false}
                 autoPlay
                 onPlay={() => setIsVideoPlaying(true)}
                 onPause={() => setIsVideoPlaying(false)}
@@ -2078,8 +2111,22 @@ const LipReadingApp = () => {
               </video>
 
               {/* Enhanced Video Controls */}
-              <div className="absolute bottom-4 left-4 right-4">
-                <div className="bg-black/80 backdrop-blur-sm rounded-lg p-4 space-y-3 border border-orange-500/20">
+              <div className={`absolute bottom-2 left-2 right-2 transition-all duration-500 ${
+                isControlsVisible ? 'opacity-100 translate-y-0' : 'opacity-20 translate-y-2'
+              }`}>
+                <div className={`backdrop-blur-sm rounded-lg p-3 space-y-2 border transition-all duration-500 ${
+                  isControlsVisible 
+                    ? 'bg-black/80 border-orange-500/20' 
+                    : 'bg-black/40 border-orange-500/10'
+                }`}>
+                  {/* Hover Indicator */}
+                  {!isControlsVisible && (
+                    <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 -translate-y-full">
+                      <div className="bg-orange-500/80 text-white text-xs px-2 py-1 rounded-md opacity-60 animate-pulse">
+                        Hover for controls
+                      </div>
+                    </div>
+                  )}
                   {/* Top Row - Title and Close */}
                   <div className="flex items-center justify-between">
                     <div>
@@ -2153,60 +2200,37 @@ const LipReadingApp = () => {
             </div>
 
             {/* Modal Footer with Instructions */}
-            <div className="relative z-10 p-6 bg-gradient-to-r from-black/60 via-gray-900/80 to-black/60 backdrop-blur-lg border-t border-orange-500/20">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm mb-4">
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-full flex items-center justify-center border border-orange-500/30">
-                    <span className="text-orange-400 font-bold">1</span>
+            <div className={`relative z-10 p-4 backdrop-blur-lg border-t transition-all duration-500 ${
+              isControlsVisible 
+                ? 'bg-gradient-to-r from-black/60 via-gray-900/80 to-black/60 border-orange-500/20' 
+                : 'bg-gradient-to-r from-black/40 via-gray-900/60 to-black/40 border-orange-500/10'
+            }`}>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm mb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="w-6 h-6 bg-gradient-to-r from-orange-500/20 to-amber-500/20 rounded-full flex items-center justify-center border border-orange-500/30">
+                    <span className="text-orange-400 font-bold text-xs">1</span>
                   </div>
                   <div>
-                    <p className="text-white font-medium">Position Your Hand</p>
-                    <p className="text-orange-300">Keep hand clearly visible in camera</p>
+                    <p className="text-white font-medium text-sm">Position Your Hand</p>
+                    <p className="text-orange-300 text-xs">Keep hand clearly visible in camera</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
-                    <span className="text-amber-400 font-bold">2</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-6 h-6 bg-gradient-to-r from-amber-500/20 to-yellow-500/20 rounded-full flex items-center justify-center border border-amber-500/30">
+                    <span className="text-amber-400 font-bold text-xs">2</span>
                   </div>
                   <div>
-                    <p className="text-white font-medium">Make Clear Gestures</p>
-                    <p className="text-amber-300">Follow the demo movements</p>
+                    <p className="text-white font-medium text-sm">Make Clear Gestures</p>
+                    <p className="text-amber-300 text-xs">Follow the demo movements</p>
                   </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <div className="w-8 h-8 bg-gradient-to-r from-orange-600/20 to-red-500/20 rounded-full flex items-center justify-center border border-orange-600/30">
-                    <span className="text-orange-300 font-bold">3</span>
+                <div className="flex items-center space-x-2">
+                  <div className="w-6 h-6 bg-gradient-to-r from-orange-600/20 to-red-500/20 rounded-full flex items-center justify-center border border-orange-600/30">
+                    <span className="text-orange-300 font-bold text-xs">3</span>
                   </div>
                   <div>
-                    <p className="text-white font-medium">Practice & Detect</p>
-                    <p className="text-orange-200">Start detection after watching</p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Video Controls Help */}
-              <div className="border-t border-orange-500/10 pt-4">
-                <p className="text-white font-medium text-sm mb-2">
-                  <span className="bg-gradient-to-r from-orange-400 to-amber-500 bg-clip-text text-transparent">
-                    Video Controls:
-                  </span>
-                </p>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-gray-400">
-                  <div className="flex items-center space-x-2">
-                    <Play size={14} className="text-orange-400" />
-                    <span>Play/Pause</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RotateCw size={14} className="text-amber-400" />
-                    <span>Replay</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <SkipBack size={14} className="text-orange-300" />
-                    <span>Rewind 10s</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Settings size={14} className="text-orange-500" />
-                    <span>Speed: 0.5x-2x</span>
+                    <p className="text-white font-medium text-sm">Practice & Detect</p>
+                    <p className="text-orange-200 text-xs">Start detection after watching</p>
                   </div>
                 </div>
               </div>
