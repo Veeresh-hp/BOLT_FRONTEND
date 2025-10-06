@@ -564,6 +564,15 @@ const LipReadingApp = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
+  // Helper function for logo click - navigate to home or scroll to top if already on home
+  const handleLogoClick = () => {
+    if (currentPage === 'home') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } else {
+      navigateToPage('home');
+    }
+  };
+
   const navigateToPage = (page) => setCurrentPage(page);
 
   const renderHome = () => (
@@ -644,7 +653,8 @@ const LipReadingApp = () => {
           <img 
             src="/BOLT logo.png" 
             alt="BOLT Logo" 
-            className="h-8 sm:h-10 w-auto object-contain"
+            className="h-8 sm:h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity duration-300"
+            onClick={handleLogoClick}
           />
         </div>
         <div className={`flex flex-wrap gap-3 sm:gap-6 transition-all duration-300 ${
@@ -1508,7 +1518,8 @@ const LipReadingApp = () => {
           <img 
             src="/BOLT logo.png" 
             alt="BOLT Logo" 
-            className="h-8 sm:h-10 w-auto object-contain ml-2"
+            className="h-8 sm:h-10 w-auto object-contain ml-2 cursor-pointer hover:opacity-80 transition-opacity duration-300"
+            onClick={handleLogoClick}
           />
         </div>
         <div className={`flex flex-wrap gap-3 sm:gap-6 transition-all duration-300 ${
@@ -1624,7 +1635,8 @@ const LipReadingApp = () => {
           <img 
             src="/BOLT logo.png" 
             alt="BOLT Logo" 
-            className="h-8 sm:h-10 w-auto object-contain ml-2"
+            className="h-8 sm:h-10 w-auto object-contain ml-2 cursor-pointer hover:opacity-80 transition-opacity duration-300"
+            onClick={handleLogoClick}
           />
         </div>
         <div className={`flex flex-wrap gap-3 sm:gap-6 transition-all duration-300 ${
